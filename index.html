@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cost of Waiting & Cash Requirements</title>
+    <style>
+        :root { --primary: #0f172a; --accent: #38bdf8; --loss: #ef4444; --gain: #10b981; }
+        body { font-family: 'Inter', system-ui, sans-serif; background: #f1f5f9; padding: 20px; color: #1e293b; line-height: 1.5; }
+        .wrapper { max-width: 1100px; margin: auto; display: grid; grid-template-columns: 350px 1fr; gap: 20px; }
+        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; color: #64748b; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px; margin-top: 0; }
+        .input-group { margin-bottom: 15px; }
+        label { display: block; font-size: 0.7rem; font-weight: 700; margin-bottom: 4px; color: #475569; }
+        input { width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; font-size: 1rem; }
+        
+        .outcome-banner { background: var(--primary); color: white; padding: 30px; border-radius: 12px; text-align: center; margin-bottom: 25px; border-left: 8px solid var(--accent); }
+        .outcome-val { font-size: 3rem; font-weight: 800; color: var(--accent); display: block; }
+        
+        .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px; }
+        .stat-box { background: white; padding: 15px; border-radius: 10px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .stat-num { font-size: 1.2rem; font-weight: 700; display: block; }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        td { padding: 12px 0; border-bottom: 1px solid #f1f5f9; font-size: 0.95rem; }
+        .bold { font-weight: 800; text-align: right; }
+        
+        .be-box { background: #fff7ed; border: 1px solid #ffedd5; padding: 25px; border-radius: 12px; text-align: center; }
+        .be-val { font-size: 2.5rem; font-weight: 800; color: #ea580c; line-height: 1; margin: 10px 0; }
+
+        .cash-alert { background: #eff6ff; border: 1px solid #dbeafe; padding: 15px; border-radius: 8px; margin-top: 15px; font-size: 0.85rem; color: #1e40af; }
+
+        .disclaimer { 
+            grid-column: span 2; 
+            margin-top: 40px; 
+            padding: 25px; 
+            border-top: 1px solid #e2e8f0; 
+            font-size: 0.75rem; 
+            color: #94a3b8; 
+            text-align: center; 
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+
+<div class="wrapper">
+    <div class="sidebar">
+        <div class="card">
+            <h2>Market & Costs</h2>
+            <div class="input-group"><label>Home Price Today ($)</label><input type="number" id="pToday" value="450000" oninput="run()"></div>
+            <div class="input-group"><label>Down Payment (%)</label><input type="number" id="downPct" value="5" oninput="run()"></div>
+            <div class="input-group"><label>Property Tax Rate (%/yr)</label><input type="number" id="taxRate" value="1.2" step="0.1" oninput="run()"></div>
+            <div class="input-group"><label>Monthly Insurance ($)</label><input type="number" id="insur" value="150" oninput="run()"></div>
+            <div class="input-group"><label>Wait Time (Months)</label><input type="number" id="waitM" value="12" oninput="run()"></div>
+            <div class="input-group"><label>Annual Appreciation (%)</label><input type="number" id="appR" value="5" step="0.1" oninput="run()"></div>
+            <div class="input-group"><label>Monthly Rent ($)</label><input type="number" id="rent" value="2500" oninput="run()"></div>
+        </div>
+        <div class="card">
+            <h2>Loan Scenarios</h2>
+            <div class="input-group"><label>Rate Today (%)</label><input type="number" id="rToday" value="7.2" step="0.1" oninput="run()"></div>
+            <div class="input-group"><label>Future Rate (%)</label><input type="number" id="rFuture" value="5.5" step="0.1" oninput="run()"></div>
+            <div class="input-group"><label>Refi Cost ($)</label><input type="number" id="refiCost" value="8000" oninput="run()"></div>
+        </div>
+    </div>
+
+    <div class="main">
+        <div class="outcome-banner">
+            <span style="text-transform: uppercase; font-size: 0.75rem; letter-spacing: 1px; color: #94a3b8;">TOTAL INITIAL COST OF WAITING</span>
+            <span id="wealthGap" class="outcome-val">$0</span>
+        </div>
+
+        <div class="stat-grid">
+            <div class="stat-box"><span id="pmtNow" class="stat-num">$0</span><span style="font-size: 0.65rem; color: #64748b; text-transform: uppercase;">Buy Now (PITI)</span></div>
+            <div class="stat-box"><span id="pmtWait" class="stat-num">$0</span><span style="font-size: 0.65rem; color: #64748b; text-transform: uppercase;">Wait Pmt (PITI)</span></div>
+            <div class="stat-box"><span id="pmtSave" class="stat-num" style="color: var(--gain);">$0</span><span style="font-size: 0.65rem; color: #64748b; text-transform: uppercase;">Mo. Savings</span></div>
+        </div>
+
+        <div class="card">
+            <h2>Wealth & Cash Analysis</h2>
+            <table>
+                <tr><td>Rent Paid (Money Lost)</td><td id="rentLoss" class="bold" style="color:var(--loss)">$0</td></tr>
+                <tr><td>Equity Lost (Missed Appreciation)</td><td id="appLoss" class="bold" style="color:var(--loss)">$0</td></tr>
+                <tr><td>Equity Lost (Missed Principal Paydown)</td><td id="payLoss" class="bold" style="color:var(--loss)">$0</td></tr>
+                <tr><td>Refi Cost (Expense for Buyer Now)</td><td id="refiSave" class="bold" style="color:var(--gain)">-$0</td></tr>
+                <tr style="background:#f8fafc;"><td><strong>Down Payment Needed Today</strong></td><td id="downNow" class="bold">$0</td></tr>
+                <tr style="background:#f8fafc;"><td><strong>Down Payment Needed Later</strong></td><td id="downWait" class="bold">$0</td></tr>
+                <tr style="border-top: 2px solid #334155;"><td><strong>Net Initial Wealth Impact</strong></td><td id="netWait" class="bold">$0</td></tr>
+            </table>
+            <div class="cash-alert" id="cashAlert">
+                By waiting, you will need an extra <strong>$0</strong> just for your down payment.
+            </div>
+        </div>
+
+        <div class="be-box">
+            <span style="font-size: 0.75rem; font-weight: bold; text-transform: uppercase; color: #9a3412;">Break-Even Recovery Time</span>
+            <div id="beYears" class="be-val">0.0 Years</div>
+            <p style="font-size: 0.85rem; color: #9a3412; margin: 0; max-width: 500px; margin: auto;">Years of lower payments needed to recover the wealth lost while waiting.</p>
+        </div>
+    </div>
+
+    <div class="disclaimer">
+        <strong>DISCLAIMER:</strong> This presentation and website are for educational and informational purposes only and do not constitute professional financial, tax, or legal advice. The information provided is general in nature and has not been tailored to the specific objectives, financial situation, or needs of any particular individual. All mathematical examples, hypotheticals, and "Cost of Waiting" scenarios are provided for illustrative purposes only and are based on assumptions that may not materialize or may differ significantly due to market volatility. Real estate investing carries inherent risks, and past performance is not a guarantee of future results. No information herein should be construed as a recommendation to buy or sell any specific security or financial product. You should always consult with a qualified financial advisor, tax professional, or attorney before making any decisions based on the information provided. Use of this information is at your own risk.
+    </div>
+</div>
+
+<script>
+    function getPrincipal(p, r, m) {
+        let bal = p; const i = (r/100)/12;
+        const pmt = (p*i)/(1 - Math.pow(1+i, -360));
+        let totalP = 0;
+        for(let j=0; j<m; j++) { let int = bal*i; let princ = pmt-int; totalP += princ; bal -= princ; }
+        return totalP;
+    }
+
+    function run() {
+        const pT = parseFloat(document.getElementById('pToday').value)||0;
+        const dP = (parseFloat(document.getElementById('downPct').value)||0)/100;
+        const taxR = (parseFloat(document.getElementById('taxRate').value)||0)/100;
+        const insur = parseFloat(document.getElementById('insur').value)||0;
+        const wM = parseFloat(document.getElementById('waitM').value)||0;
+        const aR = (parseFloat(document.getElementById('appR').value)||0)/100;
+        const rent = parseFloat(document.getElementById('rent').value)||0;
+        const rT = parseFloat(document.getElementById('rToday').value)||0;
+        const rF = parseFloat(document.getElementById('rFuture').value)||0;
+        const rC = parseFloat(document.getElementById('refiCost').value)||0;
+
+        // Price Later
+        const fP = pT * Math.pow(1+aR, wM/12);
+
+        // Down Payment Math
+        const downNow = pT * dP;
+        const downWait = fP * dP;
+        const cashDiff = downWait - downNow;
+
+        // Loan Amounts (Price - Down Payment)
+        const loanNow = pT - downNow;
+        const loanWait = fP - downWait;
+
+        // P&I Calculations (on Loan Amount)
+        const piNow = (loanNow*(rT/100/12))/(1-Math.pow(1+(rT/100/12),-360));
+        const piWait = (loanWait*(rF/100/12))/(1-Math.pow(1+(rF/100/12),-360));
+
+        // Taxes & Insurance (Monthly)
+        const taxNow = (pT * taxR) / 12;
+        const taxWait = (fP * taxR) / 12; 
+        
+        const pitiNow = piNow + taxNow + insur;
+        const pitiWait = piWait + taxWait + insur;
+
+        // Wealth Calculations
+        const rL = rent * wM;
+        const aL = fP - pT;
+        const pL = getPrincipal(loanNow, rT, wM);
+        const net = (rL + aL + pL) - rC;
+        const moS = pitiNow - pitiWait;
+
+        // Update UI
+        document.getElementById('wealthGap').innerText = '$' + Math.round(net).toLocaleString();
+        document.getElementById('pmtNow').innerText = '$' + Math.round(pitiNow).toLocaleString();
+        document.getElementById('pmtWait').innerText = '$' + Math.round(pitiWait).toLocaleString();
+        document.getElementById('pmtSave').innerText = '$' + Math.round(moS).toLocaleString();
+        document.getElementById('rentLoss').innerText = '$' + Math.round(rL).toLocaleString();
+        document.getElementById('appLoss').innerText = '$' + Math.round(aL).toLocaleString();
+        document.getElementById('payLoss').innerText = '$' + Math.round(pL).toLocaleString();
+        document.getElementById('refiSave').innerText = '-$' + Math.round(rC).toLocaleString();
+        document.getElementById('downNow').innerText = '$' + Math.round(downNow).toLocaleString();
+        document.getElementById('downWait').innerText = '$' + Math.round(downWait).toLocaleString();
+        document.getElementById('netWait').innerText = '$' + Math.round(net).toLocaleString();
+        document.getElementById('beYears').innerText = moS > 0 ? (net/moS/12).toFixed(1) + " Years" : "Never";
+        document.getElementById('cashAlert').innerHTML = `By waiting, you will need an extra <strong>$${Math.round(cashDiff).toLocaleString()}</strong> just for your down payment due to appreciation.`;
+    }
+    run();
+</script>
+</body>
+</html>
